@@ -21,6 +21,10 @@ from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.generic import View
 from django.utils.decorators import method_decorator
+from django.core.exceptions import ValidationError
+from django.db import transaction
+
+from smssync.models import IncomingMessage, OutgoingMessage
 
 import logging
 logger = logging.getLogger(__name__)
@@ -38,8 +42,10 @@ def get_msg_kwargs(request_dict):
 
 
 @method_decorator(csrf_exempt, name='dispatch')
+#TODO: decorate with custom auth class to check secret
 class SyncView(View):
 
+    @transaction.atomic
     def post(self, request):
         task = request.POST.get('task', '')
 
@@ -55,6 +61,7 @@ class SyncView(View):
 
         return JsonResponse(response)
 
+    @transaction.atomic
     def get(self, request):
         task = request.GET.get('task', '')
         if task == 'send':
@@ -65,24 +72,17 @@ class SyncView(View):
 
 
 def get_message(params):
-    logger.info("Got message: {}".format(repr(params)))
+    logger.info("Receiving message: {}".format(repr(params)))
     payload={}
     payload['success'] = False
     payload['error'] = None
 
-    REQUIRED_KEYWORDS = ['from',
-                         'message',
-                         'sent_timestamp',
-                         'message_id',]
-    missing = []
-
-    for f in REQUIRED_KEYWORDS:
-        if not len(params.get(f,'')):
-            missing.append(f)
-
-    if len(missing):
-        payload['error'] = "Required keyword(s) missing: {}".format(
-            ",".join(missing))
+    try:
+        IncomingMessage.create(**params).save()
+    except (KeyError, ValidationError) as e:
+        payload['error'] = str(e.args[0])
+    except Exception as e:
+        raise
     else:
         payload['success'] = True
 
@@ -93,26 +93,19 @@ def send_task(params):
 
     payload={}
     payload['task'] = 'send'
-    payload['secret'] = '123456'
-    payload['messages'] = _get_outgoing_messages()
+    payload['secret'] = '123456' #TODO: put in app conf
+    payload['messages'] = get_outgoing_messages()
     payload['error'] = None
 
     return {"payload":payload}
 
 
-def _get_outgoing_messages():
+def get_outgoing_messages():
+
     messages = []
 
-    m0 = {'message': "Sample Task Message",
-          'to': "+000-000-0000",
-          'uuid': "1ba368bd-c467-4374-bf28",}
-    logger.info("Sent message: {}".format(repr(m0)))
-    messages.append(m0)
-
-    m1 = {'message': "Sample Task Message",
-          'to': "+000-000-0000",
-          'uuid': "1ba368bd-c467-4374-bf28",}
-    logger.info("Sent message: {}".format(repr(m1)))
-    messages.append(m1)
-
+    for m in OutgoingMessage.objects.outgoing():
+        m.mark_as_sent()
+        messages.append(m.task_dict)
+        logger.info("Sending message: {}".format(repr(m.task_dict)))
     return messages

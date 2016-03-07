@@ -11,6 +11,8 @@ stored in the database. Message Results API is not supported yet.
 
 Detailed documentation ~~is~~ will be in the "docs" directory.
 
+django-smssync was inspired by [SMSsync-Python-Django-webservice](https://github.com/cwanjau/SMSsync-Python-Django-webservice/).
+
 Quick start
 -----------
 

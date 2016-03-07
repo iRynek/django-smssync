@@ -5,7 +5,7 @@
 # This file is part of django-smssync
 #
 # django-smssync is free software: you can redistribute it and/or modify
-# it under the terms of the GNU General Public License as published by
+# it under the terms of the GNU Affero General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version.
 #
@@ -14,20 +14,13 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 #
-# You should have received a copy of the GNU General Public License
+# You should have received a copy of the GNU Affero General Public License
 # along with django-smssync.  If not, see <http://www.gnu.org/licenses/>.
 
 
-from django.contrib import admin
-
-from smssync.models import IncomingMessage, OutgoingMessage
+from django.db import models
 
 
-class IncomingMessageAdmin(admin.ModelAdmin):
-    model = IncomingMessage
-
-class OutgoingMessageAdmin(admin.ModelAdmin):
-    model = OutgoingMessage
-
-admin.site.register(IncomingMessage, IncomingMessageAdmin)
-admin.site.register(OutgoingMessage, OutgoingMessageAdmin)
+class OutgoingMessageQuerySet(models.QuerySet):
+    def outgoing(self):
+        return self.filter(sent=False)

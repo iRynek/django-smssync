@@ -21,7 +21,10 @@
 from django.test import TestCase, RequestFactory, Client
 from django.core.urlresolvers import reverse_lazy
 
+from model_mommy import mommy
+
 from smssync.views import SyncView
+from smssync.models import IncomingMessage, OutgoingMessage
 
 class SyncViewTests(TestCase):
 
@@ -55,6 +58,25 @@ class SyncViewTests(TestCase):
         msg = "Task wasn't {}: {}".format(payload, task)
         self.assertEqual(payload, task, msg=msg)
 
+    def assertIncomingMessage(self, message_id):
+        self.assertTrue(IncomingMessage.objects
+                        .filter(message_id=message_id).exists())
+
+    def assertIncomingMessageCount(self, count):
+        db_count = IncomingMessage.objects.all().count()
+        msg = "Incoming message count wasn't %d: %d" % (count, db_count)
+        self.assertEqual(count, db_count, msg=msg)
+
+    def assertOutgoingMessageCount(self, count):
+        db_count = OutgoingMessage.objects.all().count()
+        msg = "Outgoing message count wasn't %d: %d" % (count, db_count)
+        self.assertEqual(count, db_count, msg=msg)
+
+    def assertUnsentOutgoingMessageCount(self, count):
+        db_count = OutgoingMessage.objects.outgoing().count()
+        msg = "Outgoing unsent message count wasn't %d: %d" % (count, db_count)
+        self.assertEqual(count, db_count, msg=msg)
+
     def assertStatusCode(self, status_code, response):
         msg = "Status code wasn't %d: %d" % (status_code,
                                           response.status_code)
@@ -74,6 +96,7 @@ class SyncViewTests(TestCase):
         self.factory = RequestFactory()
         self.client = Client()
 
+
     def test_post_message(self):
         """
         Test smssync posting a message to the server:
@@ -91,20 +114,22 @@ class SyncViewTests(TestCase):
                   'message': "sample text",
                   'secret': "123456",
                   'device_id': "1",
-                  'sent_timestamp': "123456789",
+                  'sent_timestamp': "1298244863",
                   'message_id': "80",
                   }
 
         response = self.client.post(self.url, params)
         self.assert200(response)
         self.assertPayloadSuccess(response)
+        self.assertIncomingMessage(message_id='80')
+        self.assertIncomingMessageCount(1)
 
     def test_post_message_missing_from(self):
         params = {'from': "",
                   'message': "sample text",
                   'secret': "123456",
                   'device_id': "1",
-                  'sent_timestamp': "123456789",
+                  'sent_timestamp': "1298244863",
                   'message_id': "80",
                   }
 
@@ -113,10 +138,34 @@ class SyncViewTests(TestCase):
         expected_error_msg = "Required keyword(s) missing: from"
         self.assertPayloadFail(response, expected_error_msg)
 
+    def test_post_message_bad_timestamp(self):
+        params = {'from': "",
+                  'message': "sample text",
+                  'secret': "123456",
+                  'device_id': "1",
+                  'sent_timestamp': "1298244863",
+                  'message_id': "80",
+                  }
+
+        response = self.client.post(self.url, params)
+        self.assert200(response)
+        self.assertPayloadFail(response)
+
     def test_get_task(self):
+        m0 = mommy.make(OutgoingMessage, to="+000-000-000")
+        m1 = mommy.make(OutgoingMessage, to="+000-000-000")
         params = {'task': "send",}
         response = self.client.get(self.url, params)
         self.assert200(response)
         self.assertPayloadSecret(response, '123456')
         self.assertPayloadMessageCount(response, 2)
         self.assertPayloadTask(response, 'send')
+        self.assertUnsentOutgoingMessageCount(0)
+        self.assertOutgoingMessageCount(2)
+        # send more messages and check if database is ok
+        m2 = mommy.make(OutgoingMessage, to="+000-000-000")
+        self.assertUnsentOutgoingMessageCount(1)
+        response = self.client.get(self.url, params)
+        self.assert200(response)
+        self.assertUnsentOutgoingMessageCount(0)
+        self.assertOutgoingMessageCount(3)

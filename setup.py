@@ -9,13 +9,13 @@ os.chdir(os.path.normpath(os.path.join(os.path.abspath(__file__), os.pardir)))
 
 setup(
     name='django-smssync',
-    version='0.1',
+    version='0.2',
     packages=find_packages(),
     include_package_data=True,
     license='GNU GPLv3',
-    description='A simple Django app to integrate with SMSSync, an SMS gateway.',
+    description='A simple Django app to integrate with SMSSync, an SMS gateway for Android.',
     long_description=README,
-    url='https://www.example.com/',
+    url='https://github.com/rodrigopitanga/django-smssync/',
     author='Rodrigo Pitanga',
     author_email='pitanga@members.fsf.org',
     classifiers=[
