@@ -59,9 +59,8 @@ class SMSSyncBaseTest(TestCase):
         msg = "Task wasn't {}: {}".format(payload, task)
         self.assertEqual(payload, task, msg=msg)
 
-    def assertIncomingMessageExists(self, message_id):
-        self.assertTrue(IncomingMessage.objects
-                        .filter(message_id=message_id).exists())
+    def assertIncomingMessageExists(self, id):
+        self.assertTrue(IncomingMessage.objects.filter(id=id).exists())
 
     def assertIncomingMessageCount(self, count):
         db_count = IncomingMessage.objects.all().count()
@@ -70,12 +69,11 @@ class SMSSyncBaseTest(TestCase):
 
     def assertUnreceivedIncomingMessageCount(self, count):
         db_count = IncomingMessage.objects.filter(received=False).count()
-        msg = "Incoming message count wasn't %d: %d" % (count, db_count)
+        msg = "Unreceived message count wasn't %d: %d" % (count, db_count)
         self.assertEqual(count, db_count, msg=msg)
 
     def assertOutgoingMessageExists(self, id):
-        self.assertTrue(OutgoingMessage.objects
-                        .filter(id=id).exists())
+        self.assertTrue(OutgoingMessage.objects.filter(id=id).exists())
 
     def assertOutgoingMessageCount(self, count):
         db_count = OutgoingMessage.objects.all().count()
@@ -84,7 +82,7 @@ class SMSSyncBaseTest(TestCase):
 
     def assertUnsentOutgoingMessageCount(self, count):
         db_count = OutgoingMessage.objects.filter(sent=False).count()
-        msg = "Outgoing unsent message count wasn't %d: %d" % (count, db_count)
+        msg = "Unsent message count wasn't %d: %d" % (count, db_count)
         self.assertEqual(count, db_count, msg=msg)
 
     def assertStatusCode(self, status_code, response):
@@ -103,6 +101,23 @@ class SMSSyncBaseTest(TestCase):
 
 
 class ModelTests(SMSSyncBaseTest):
+
+    def test_mark_as_sent(self):
+        m0 = mommy.make(OutgoingMessage, to="+000-000-000")
+        assert not m0.sent
+        m0.mark_as_sent()
+        assert m0.sent
+        from django.utils import timezone
+        assert m0.sent_timestamp < timezone.now()
+
+    def test_mark_as_received(self):
+        m0 = mommy.make(IncomingMessage, sent_from="+000-000-000")
+        assert not m0.received
+        m0.mark_as_received()
+        assert m0.received
+        from django.utils import timezone
+        assert m0.received_timestamp < timezone.now()
+
     def test_incoming_from_filter(self):
         m0 = mommy.make(IncomingMessage, sent_from="+000-000-000")
         m1 = mommy.make(IncomingMessage, sent_from="+000-000-001")
@@ -148,13 +163,12 @@ class SyncViewTests(SMSSyncBaseTest):
                   'secret': "123456",
                   'device_id': "1",
                   'sent_timestamp': "1298244863",
-                  'message_id': "80",
+                  'message_id': "6b5232ad-2bb3-4d94-8dcb-3a50ffbcadc9",
                   }
 
         response = self.client.post(self.url, params)
         self.assert200(response)
         self.assertPayloadSuccess(response)
-        self.assertIncomingMessageExists(message_id='80')
         self.assertIncomingMessageCount(1)
 
     def test_post_message_missing_from(self):
@@ -163,7 +177,7 @@ class SyncViewTests(SMSSyncBaseTest):
                   'secret': "123456",
                   'device_id': "1",
                   'sent_timestamp': "1298244863",
-                  'message_id': "80",
+                  'message_id': "6b5232ad-2bb3-4d94-8dcb-3a50ffbcadc9",
                   }
 
         response = self.client.post(self.url, params)
@@ -177,7 +191,7 @@ class SyncViewTests(SMSSyncBaseTest):
                   'secret': "123456",
                   'device_id': "1",
                   'sent_timestamp': "1298244863",
-                  'message_id': "80",
+                  'message_id': "6b5232ad-2bb3-4d94-8dcb-3a50ffbcadc9",
                   }
 
         response = self.client.post(self.url, params)

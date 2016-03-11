@@ -112,12 +112,14 @@ class IncomingMessage(Message):
                       sent_to=kwargs.get('sent_to',""),
                       device_id=kwargs.get('device_id',""),
         )
+        message.save()
         return message
         
     def mark_as_received(self):
         self.received = True
         self.received_timestamp = timezone.now()
         self.save()
+        return self
 
 
 class OutgoingMessage(Message):
@@ -138,6 +140,8 @@ class OutgoingMessage(Message):
     sent_timestamp = models.DateTimeField(null=True,
                                           blank=True)
 
+    """ Fields below will be needed for Results API """
+
     # queued = models.BooleanField(default=False)
     # queued_timestamp = models.DateTimeField(null=False)
     #
@@ -154,6 +158,14 @@ class OutgoingMessage(Message):
     #                                             null=True,
     #                                             blank=True)
     # sms_delivered_report_timestamp = models.DateTimeField(null=True)
+
+
+    @classmethod
+    def create(cls, text, to):
+        message = cls(to=to,
+                      message=text)
+        message.save()
+        return message
 
     def mark_as_sent(self):
         self.sent = True
