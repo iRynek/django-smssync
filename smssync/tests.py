@@ -26,7 +26,8 @@ from model_mommy import mommy
 from smssync.views import SyncView
 from smssync.models import IncomingMessage, OutgoingMessage
 
-class SyncViewTests(TestCase):
+
+class SMSSyncBaseTest(TestCase):
 
     def assertPayloadSuccess(self, response):
         assert response.json()['payload']['success']
@@ -58,7 +59,7 @@ class SyncViewTests(TestCase):
         msg = "Task wasn't {}: {}".format(payload, task)
         self.assertEqual(payload, task, msg=msg)
 
-    def assertIncomingMessage(self, message_id):
+    def assertIncomingMessageExists(self, message_id):
         self.assertTrue(IncomingMessage.objects
                         .filter(message_id=message_id).exists())
 
@@ -67,13 +68,22 @@ class SyncViewTests(TestCase):
         msg = "Incoming message count wasn't %d: %d" % (count, db_count)
         self.assertEqual(count, db_count, msg=msg)
 
+    def assertUnreceivedIncomingMessageCount(self, count):
+        db_count = IncomingMessage.objects.filter(received=False).count()
+        msg = "Incoming message count wasn't %d: %d" % (count, db_count)
+        self.assertEqual(count, db_count, msg=msg)
+
+    def assertOutgoingMessageExists(self, id):
+        self.assertTrue(OutgoingMessage.objects
+                        .filter(id=id).exists())
+
     def assertOutgoingMessageCount(self, count):
         db_count = OutgoingMessage.objects.all().count()
         msg = "Outgoing message count wasn't %d: %d" % (count, db_count)
         self.assertEqual(count, db_count, msg=msg)
 
     def assertUnsentOutgoingMessageCount(self, count):
-        db_count = OutgoingMessage.objects.outgoing().count()
+        db_count = OutgoingMessage.objects.filter(sent=False).count()
         msg = "Outgoing unsent message count wasn't %d: %d" % (count, db_count)
         self.assertEqual(count, db_count, msg=msg)
 
@@ -91,6 +101,29 @@ class SyncViewTests(TestCase):
     def assert503(self, response):
         self.assertStatusCode(500, response)
 
+
+class ModelTests(SMSSyncBaseTest):
+    def test_incoming_from_filter(self):
+        m0 = mommy.make(IncomingMessage, sent_from="+000-000-000")
+        m1 = mommy.make(IncomingMessage, sent_from="+000-000-001")
+        self.assertEqual(m1.id,IncomingMessage.objects.
+                         sent_from("+000-000-001").first().id)
+
+    def test_incoming_filter(self):
+        m0 = mommy.make(IncomingMessage, sent_from="+000-000-000",received=True)
+        m1 = mommy.make(IncomingMessage, sent_from="+000-000-001",received=False)
+        self.assertIncomingMessageCount(2)
+        self.assertUnreceivedIncomingMessageCount(1)
+
+
+    def test_outgoing_filter(self):
+        m0 = mommy.make(OutgoingMessage, to="+000-000-000", sent=True)
+        m1 = mommy.make(OutgoingMessage, to="+000-000-001", sent=False)
+        self.assertOutgoingMessageCount(2)
+        self.assertUnsentOutgoingMessageCount(1)
+
+
+class SyncViewTests(SMSSyncBaseTest):
     def setUp(self):
         self.url = reverse_lazy("sync_url")
         self.factory = RequestFactory()
@@ -121,7 +154,7 @@ class SyncViewTests(TestCase):
         response = self.client.post(self.url, params)
         self.assert200(response)
         self.assertPayloadSuccess(response)
-        self.assertIncomingMessage(message_id='80')
+        self.assertIncomingMessageExists(message_id='80')
         self.assertIncomingMessageCount(1)
 
     def test_post_message_missing_from(self):
