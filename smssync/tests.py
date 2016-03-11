@@ -216,3 +216,76 @@ class SyncViewTests(SMSSyncBaseTest):
         self.assert200(response)
         self.assertUnsentOutgoingMessageCount(0)
         self.assertOutgoingMessageCount(3)
+
+
+class APITests(SMSSyncBaseTest):
+
+    def _setup_incoming(self, count):
+        for i in range(count):
+            mommy.make(IncomingMessage,
+                       sent_from="+000-000-00{}".format(str(i)))
+
+    def test_send(self):
+        from smssync import smssync
+        self.assertOutgoingMessageCount(0)
+        om = smssync.send("Hello", "+000-000-000")
+        assert isinstance (om, OutgoingMessage)
+        self.assertOutgoingMessageExists(om.id)
+        self.assertUnsentOutgoingMessageCount(1)
+
+    def test_receive(self):
+        """
+        Test if messages are correctly marked as reveived when received
+        """
+        initial = 4
+        self._setup_incoming(initial)
+        from smssync import smssync
+        self.assertIncomingMessageCount(initial)
+        self.assertUnreceivedIncomingMessageCount(initial)
+        received_count = 0
+        for im in smssync.receive():
+            assert isinstance(im, IncomingMessage)
+            self.assertIncomingMessageExists(im.id)
+            received_count += 1
+        self.assertUnreceivedIncomingMessageCount(0)
+        self.assertEqual(received_count, initial)
+        self.assertIncomingMessageCount(initial)
+
+    def test_receive_from(self):
+        """
+        Test if the sent_from receiver filter filters out messages from other
+        senders, preventing them from being received
+        """
+        initial = 4
+        self._setup_incoming(initial)
+        from smssync import smssync
+        self.assertIncomingMessageCount(initial)
+        self.assertUnreceivedIncomingMessageCount(initial)
+        received_count = 0
+        #put another message from the same sender
+        mommy.make(IncomingMessage, sent_from="+000-000-000")
+        for im in smssync.receive("+000-000-000"):
+            received_count += 1
+        self.assertEqual(received_count, 2)
+        self.assertUnreceivedIncomingMessageCount((initial+1)-received_count)
+        self.assertIncomingMessageCount(initial+1)
+
+    def test_receive_break(self):
+        """
+        Test the receive() generator works, that is, the messages are marked as
+        received only if they are actually iterated through.
+        """
+        initial = 8
+        stop = 3
+        self._setup_incoming(initial)
+        from smssync import smssync
+        self.assertIncomingMessageCount(initial)
+        self.assertUnreceivedIncomingMessageCount(initial)
+        received_count = 0
+        for im in smssync.receive():
+            received_count += 1
+            if received_count == stop:
+                break
+        self.assertEqual(received_count, stop)
+        self.assertUnreceivedIncomingMessageCount(initial-stop)
+        self.assertIncomingMessageCount(initial)
