@@ -20,14 +20,14 @@
 from django.http import JsonResponse
 from django.conf import settings
 
-def secret_required(function=None, secret_value=None):
+def secret_required(function=None, secret_key=None):
     """Check that the secret sent by the device mathces the configuration
 
     This decorator ensures that the 'secret' field in the requests matches
     the secret configured on the server
     """
-    if secret_value is None:
-        secret_value = settings.SMSSYNC_SECRET_VALUE
+    if secret_key is None:
+        secret_key = settings.SMSSYNC_SECRET_KEY
 
     def _dec(view_func):
         def _view(request, *args, **kwargs):
@@ -36,7 +36,7 @@ def secret_required(function=None, secret_value=None):
                 request_secret = request.GET.get('secret')
             elif request.method == 'POST':
                 request_secret = request.POST.get('secret')
-            if request_secret == secret_value:
+            if request_secret == secret_key:
                 return view_func(request, *args, **kwargs)
             else:
                 payload={}

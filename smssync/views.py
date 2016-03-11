@@ -93,7 +93,7 @@ def send_task(params):
 
     payload={}
     payload['task'] = 'send'
-    payload['secret'] = settings.SMSSYNC_SECRET_VALUE
+    payload['secret'] = settings.SMSSYNC_SECRET_KEY
     payload['messages'] = get_outgoing_messages()
     payload['error'] = None
 

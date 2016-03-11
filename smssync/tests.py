@@ -147,9 +147,10 @@ class SyncViewTests(SMSSyncBaseTest):
         self.url = reverse_lazy("sync_url")
         self.factory = RequestFactory()
         self.client = Client()
+        self.secret = settings.SMSSYNC_SECRET_KEY
         self.post_params = {'from': "+000-000-0000",
                             'message': "sample text",
-                            'secret': settings.SMSSYNC_SECRET_VALUE,
+                            'secret': self.secret,
                             'device_id': "1",
                             'sent_timestamp': "1298244863000",
                             'message_id': "6b5232ad-2bb3-4d94-8dcb-3a50ffbcadc9"}
@@ -209,10 +210,10 @@ class SyncViewTests(SMSSyncBaseTest):
         m0 = mommy.make(OutgoingMessage, to="+000-000-000")
         m1 = mommy.make(OutgoingMessage, to="+000-000-000")
         get_params = {'task': "send",
-                      'secret': settings.SMSSYNC_SECRET_VALUE}
+                      'secret': self.secret}
         response = self.client.get(self.url, get_params)
         self.assert200(response)
-        self.assertPayloadSecret(response, settings.SMSSYNC_SECRET_VALUE)
+        self.assertPayloadSecret(response, self.secret)
         self.assertPayloadMessageCount(response, 2)
         self.assertPayloadTask(response, 'send')
         self.assertUnsentOutgoingMessageCount(0)
