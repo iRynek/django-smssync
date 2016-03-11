@@ -18,6 +18,9 @@ setup(
     url='https://github.com/rodrigopitanga/django-smssync/',
     author='Rodrigo Pitanga',
     author_email='pitanga@members.fsf.org',
+    install_requires=[
+        'django-phonenumber-field',
+    ],
     classifiers=[
         'Environment :: Web Environment',
         'Framework :: Django',
