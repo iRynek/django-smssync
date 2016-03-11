@@ -1,5 +1,5 @@
 # Local stuff
-env/
+env*/
 *.pyc
 .*swp
 *__pycache__*
