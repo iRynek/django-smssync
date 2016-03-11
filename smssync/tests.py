@@ -143,11 +143,16 @@ class SyncViewTests(SMSSyncBaseTest):
         self.url = reverse_lazy("sync_url")
         self.factory = RequestFactory()
         self.client = Client()
-
+        self.post_params = {'from': "+000-000-0000",
+                            'message': "sample text",
+                            'secret': "123456",
+                            'device_id': "1",
+                            'sent_timestamp': "1298244863000",
+                            'message_id': "6b5232ad-2bb3-4d94-8dcb-3a50ffbcadc9"}
 
     def test_post_message(self):
         """
-        Test smssync posting a message to the server:
+        Test smssync posting a message to the server as example from SMSSync dev:
 
         $ curl -D - -X POST http://localhost/demo.php \
             -F "from=+000-000-0000" \
@@ -158,45 +163,31 @@ class SyncViewTests(SMSSyncBaseTest):
             -F "message_id=80" \
         """
 
-        params = {'from': "+000-000-0000",
-                  'message': "sample text",
-                  'secret': "123456",
-                  'device_id': "1",
-                  'sent_timestamp': "1298244863",
-                  'message_id': "6b5232ad-2bb3-4d94-8dcb-3a50ffbcadc9",
-                  }
-
-        response = self.client.post(self.url, params)
+        response = self.client.post(self.url, self.post_params)
         self.assert200(response)
         self.assertPayloadSuccess(response)
         self.assertIncomingMessageCount(1)
+        self.assertIncomingMessageExists("6b5232ad-2bb3-4d94-8dcb-3a50ffbcadc9")
 
-    def test_post_message_missing_from(self):
-        params = {'from': "",
-                  'message': "sample text",
-                  'secret': "123456",
-                  'device_id': "1",
-                  'sent_timestamp': "1298244863",
-                  'message_id': "6b5232ad-2bb3-4d94-8dcb-3a50ffbcadc9",
-                  }
+    def test_post_message_missing_required_fields(self):
+        for field in IncomingMessage.REQUIRED_KEYWORDS:
+            _params = self.post_params.copy()
+            _params[field] = ""
+            response = self.client.post(self.url, _params)
+            self.assert200(response)
+            expected_error_msg = "Required keyword(s) missing: {}".format(field)
+            self.assertPayloadFail(response, expected_error_msg)
 
-        response = self.client.post(self.url, params)
+    def test_post_message_bad_message_id(self):
+        """
+        although SMSSync example's message_id is '80' we should expect an UUID
+        """
+        _params = self.post_params.copy()
+        _params['message_id'] = "80"
+        response = self.client.post(self.url, _params)
         self.assert200(response)
-        expected_error_msg = "Required keyword(s) missing: from"
+        expected_error_msg = "badly formed hexadecimal UUID string"
         self.assertPayloadFail(response, expected_error_msg)
-
-    def test_post_message_bad_timestamp(self):
-        params = {'from': "",
-                  'message': "sample text",
-                  'secret': "123456",
-                  'device_id': "1",
-                  'sent_timestamp': "1298244863",
-                  'message_id': "6b5232ad-2bb3-4d94-8dcb-3a50ffbcadc9",
-                  }
-
-        response = self.client.post(self.url, params)
-        self.assert200(response)
-        self.assertPayloadFail(response)
 
     def test_get_task(self):
         m0 = mommy.make(OutgoingMessage, to="+000-000-000")

@@ -78,10 +78,10 @@ def get_message(params):
     payload['error'] = None
 
     try:
-        IncomingMessage.create(**params).save()
-    except (KeyError, ValidationError) as e:
+        IncomingMessage.create(**params)
+    except (KeyError, ValueError, ValidationError) as e:
         payload['error'] = str(e.args[0])
-    except Exception as e:
+    except Exception:
         raise
     else:
         payload['success'] = True

@@ -59,10 +59,6 @@ class IncomingMessage(Message):
 
     sent_from = PhoneNumberField(blank=False)
 
-    message_id = models.CharField(max_length=32,
-                                  null=False,
-                                  blank=False)
-
     sent_to = models.CharField(max_length=32,
                                null=False,
                                blank=True)
@@ -81,18 +77,17 @@ class IncomingMessage(Message):
     received_timestamp = models.DateTimeField(null=True,
                                               blank=True)
 
+    REQUIRED_KEYWORDS = ['from',
+                         'message',
+                         'sent_timestamp',
+                         'message_id',]
 
     @classmethod
     def validate_before(cls, kwargs):
-        REQUIRED_KEYWORDS = ['from',
-                             'message',
-                             'sent_timestamp',
-                             'message_id',]
-        
         missing = []
         error = None
 
-        for f in REQUIRED_KEYWORDS:
+        for f in IncomingMessage.REQUIRED_KEYWORDS:
             if not len(kwargs.get(f,'')):
                 missing.append(f)
 
@@ -103,16 +98,21 @@ class IncomingMessage(Message):
     @classmethod
     def create(cls, **kwargs):
         cls.validate_before(kwargs)
+        # looks like timestamp is in microsecs
         millis = float(kwargs.get('sent_timestamp'))/1000
         sent_timestamp = datetime.datetime.fromtimestamp(millis)
         message = cls(sent_from=kwargs.get('from'),
                       message=kwargs.get('message'),
                       sent_timestamp=sent_timestamp,
-                      message_id=kwargs.get('message_id'),
+                      # uuid already set by app
+                      id=kwargs.get('message_id'),
                       sent_to=kwargs.get('sent_to',""),
                       device_id=kwargs.get('device_id',""),
         )
-        message.save()
+        try:
+            message.save()
+        except:
+            raise
         return message
         
     def mark_as_received(self):
@@ -164,7 +164,10 @@ class OutgoingMessage(Message):
     def create(cls, text, to):
         message = cls(to=to,
                       message=text)
-        message.save()
+        try:
+            message.save()
+        except:
+            raise
         return message
 
     def mark_as_sent(self):
