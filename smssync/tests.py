@@ -20,6 +20,7 @@
 
 from django.test import TestCase, RequestFactory, Client
 from django.core.urlresolvers import reverse_lazy
+from django.conf import settings
 
 from model_mommy import mommy
 
@@ -90,6 +91,9 @@ class SMSSyncBaseTest(TestCase):
                                           response.status_code)
         self.assertEqual(status_code, response.status_code, msg=msg)
 
+    def assert403(self, response):
+        self.assertStatusCode(403, response)
+
     def assert404(self, response):
         self.assertStatusCode(404, response)
 
@@ -97,7 +101,7 @@ class SMSSyncBaseTest(TestCase):
         self.assertStatusCode(200, response)
 
     def assert503(self, response):
-        self.assertStatusCode(500, response)
+        self.assertStatusCode(503, response)
 
 
 class ModelTests(SMSSyncBaseTest):
@@ -145,7 +149,7 @@ class SyncViewTests(SMSSyncBaseTest):
         self.client = Client()
         self.post_params = {'from': "+000-000-0000",
                             'message': "sample text",
-                            'secret': "123456",
+                            'secret': settings.SMSSYNC_SECRET_VALUE,
                             'device_id': "1",
                             'sent_timestamp': "1298244863000",
                             'message_id': "6b5232ad-2bb3-4d94-8dcb-3a50ffbcadc9"}
@@ -189,13 +193,26 @@ class SyncViewTests(SMSSyncBaseTest):
         expected_error_msg = "badly formed hexadecimal UUID string"
         self.assertPayloadFail(response, expected_error_msg)
 
+    def test_post_message_bad_secret(self):
+        """
+        make sure the secret is being checked by the views
+        """
+        _params = self.post_params.copy()
+        _params['secret'] = "42"
+        response = self.client.post(self.url, _params)
+        self.assert403(response)
+        expected_error_msg = ("The secret value sent from the device does "
+                              "not match the one on the server")
+        self.assertPayloadFail(response, expected_error_msg)
+
     def test_get_task(self):
         m0 = mommy.make(OutgoingMessage, to="+000-000-000")
         m1 = mommy.make(OutgoingMessage, to="+000-000-000")
-        params = {'task': "send",}
-        response = self.client.get(self.url, params)
+        get_params = {'task': "send",
+                      'secret': settings.SMSSYNC_SECRET_VALUE}
+        response = self.client.get(self.url, get_params)
         self.assert200(response)
-        self.assertPayloadSecret(response, '123456')
+        self.assertPayloadSecret(response, settings.SMSSYNC_SECRET_VALUE)
         self.assertPayloadMessageCount(response, 2)
         self.assertPayloadTask(response, 'send')
         self.assertUnsentOutgoingMessageCount(0)
@@ -203,7 +220,7 @@ class SyncViewTests(SMSSyncBaseTest):
         # send more messages and check if database is ok
         m2 = mommy.make(OutgoingMessage, to="+000-000-000")
         self.assertUnsentOutgoingMessageCount(1)
-        response = self.client.get(self.url, params)
+        response = self.client.get(self.url, get_params)
         self.assert200(response)
         self.assertUnsentOutgoingMessageCount(0)
         self.assertOutgoingMessageCount(3)

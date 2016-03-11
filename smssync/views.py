@@ -23,8 +23,10 @@ from django.views.generic import View
 from django.utils.decorators import method_decorator
 from django.core.exceptions import ValidationError
 from django.db import transaction
+from django.conf import settings
 
 from smssync.models import IncomingMessage, OutgoingMessage
+from smssync.decorators import secret_required
 
 import logging
 logger = logging.getLogger(__name__)
@@ -41,14 +43,12 @@ def get_msg_kwargs(request_dict):
     return {k:v for k,v in request_dict.items() if k in KEYWORDS}
 
 
-@method_decorator(csrf_exempt, name='dispatch')
-#TODO: decorate with custom auth class to check secret
+@method_decorator([csrf_exempt, secret_required], name='dispatch')
 class SyncView(View):
 
     @transaction.atomic
     def post(self, request):
         task = request.POST.get('task', '')
-
         if task == 'result':
             response = get_sms_delivery_report(
                 get_msg_kwargs(request.POST))
@@ -93,7 +93,7 @@ def send_task(params):
 
     payload={}
     payload['task'] = 'send'
-    payload['secret'] = '123456' #TODO: put in app conf
+    payload['secret'] = settings.SMSSYNC_SECRET_VALUE
     payload['messages'] = get_outgoing_messages()
     payload['error'] = None
 

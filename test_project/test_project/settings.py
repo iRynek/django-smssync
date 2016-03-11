@@ -27,3 +27,5 @@ DATABASES = {
         'NAME': os.path.join(BASE_DIR, 'db.sqlite3'),
     }
 }
+
+SMSSYNC_SECRET_VALUE = '123456'
