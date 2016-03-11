@@ -24,3 +24,11 @@ from django.db import models
 class OutgoingMessageQuerySet(models.QuerySet):
     def outgoing(self):
         return self.filter(sent=False)
+
+
+class IncomingMessageQuerySet(models.QuerySet):
+    def incoming(self):
+        return self.filter(received=False)
+
+    def sent_from(self, sent_from):
+        return self.filter(sent_from=sent_from)

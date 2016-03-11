@@ -24,7 +24,7 @@ from django.db import models
 from django.utils import timezone
 from phonenumber_field.modelfields import PhoneNumberField
 
-from smssync.managers import OutgoingMessageQuerySet
+from smssync.managers import IncomingMessageQuerySet, OutgoingMessageQuerySet
 
 from django.utils.formats import get_format
 datetime_formats = get_format('DATETIME_INPUT_FORMATS')
@@ -54,6 +54,33 @@ class Message(MessageBase, models.Model):
 
 
 class IncomingMessage(Message):
+
+    objects = IncomingMessageQuerySet.as_manager()
+
+    sent_from = PhoneNumberField(blank=False)
+
+    message_id = models.CharField(max_length=32,
+                                  null=False,
+                                  blank=False)
+
+    sent_to = models.CharField(max_length=32,
+                               null=False,
+                               blank=True)
+
+    device_id = models.CharField(max_length=32,
+                                 null=False,
+                                 blank=True)
+
+    sent_timestamp = models.DateTimeField(null=False,
+                                          blank=False)
+
+    received = models.BooleanField(default=False,
+                                   null=False,
+                                   editable=False)
+
+    received_timestamp = models.DateTimeField(null=True,
+                                              blank=True)
+
 
     @classmethod
     def validate_before(cls, kwargs):
@@ -87,22 +114,10 @@ class IncomingMessage(Message):
         )
         return message
         
-    sent_from = PhoneNumberField(blank=False)
-
-    message_id = models.CharField(max_length=32,
-                                  null=False,
-                                  blank=False)
-
-    sent_to = models.CharField(max_length=32,
-                               null=False,
-                               blank=True)
-                                 
-    device_id = models.CharField(max_length=32,
-                                 null=False,
-                                 blank=True)
-
-    sent_timestamp = models.DateTimeField(null=False,
-                                          blank=False)
+    def mark_as_received(self):
+        self.received = True
+        self.received_timestamp = timezone.now()
+        self.save()
 
 
 class OutgoingMessage(Message):
